@@ -1,0 +1,38 @@
+name: Upload IPA to App Store Connect
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show IPA
+        run: ls -lh app.ipa
+
+      - name: Upload to App Store Connect
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          set -o pipefail
+          echo "== 尝试 altool 上传 =="
+          if xcrun altool --upload-app -f app.ipa -t ios \
+              -u "$APPLE_ID" -p "$APPLE_APP_PASSWORD" --verbose; then
+            echo "altool 上传成功"
+            exit 0
+          fi
+
+          echo "== altool 失败，改用 Xcode 内置 iTMSTransporter =="
+          ITMS=$(find /Applications -name iTMSTransporter -type f 2>/dev/null | head -1)
+          echo "使用: $ITMS"
+          "$ITMS" -m upload -assetFile app.ipa \
+            -u "$APPLE_ID" -p "$APPLE_APP_PASSWORD" \
+            -itc_provider N34S6UBA4W -v informational
